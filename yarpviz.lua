@@ -69,7 +69,7 @@ function get_port_con(port_name)
   local ret = yarp.NetworkBase_connect(ping:getName(), port_name)
   if ret == false then
       print("Cannot connect to " .. port_name)
-      return nil
+      return nil, nil, nil
   end
   local cmd = yarp.Bottle()
   local reply = yarp.Bottle()
@@ -78,11 +78,25 @@ function get_port_con(port_name)
   if ping:write(cmd, reply) == false then
       print("Cannot write to " .. port_name)
       ping:close()
-      return nil, nil    
+      return nil, nil, nil
   end  
   outs_list = {}
+  outs_carlist = {}
   for i=0,reply:size()-1 do 
-    outs_list[#outs_list+1] = reply:get(i):asString()
+    out_name = reply:get(i):asString()
+    outs_list[#outs_list+1] = out_name
+    -- get the carrier
+    cmd:clear()
+    reply:clear()
+    cmd:addString("list")
+    cmd:addString("out")
+    cmd:addString(out_name)
+    if ping:write(cmd, reply) == false then
+      print("Cannot write to " .. port_name)
+      ping:close()
+      return nil, outs_list, nil 
+    end
+    outs_carlist[#outs_carlist+1] = reply:find("carrier"):asString()
   end 
 
   cmd:clear()
@@ -92,14 +106,14 @@ function get_port_con(port_name)
   if ping:write(cmd, reply) == false then
       print("Cannot write to " .. port_name)
       ping:close()
-      return nil, outs_list    
+      return nil, outs_list, outs_carlist
   end  
   ins_list = {}
   for i=0,reply:size()-1 do 
     ins_list[#ins_list+1] = reply:get(i):asString()
   end 
   ping:close()
-  return ins_list, outs_list
+  return ins_list, outs_list, outs_carlist
 end
 
 ---------------------------------------------------------------------
@@ -139,10 +153,10 @@ if typ == "txt" then
 
     for name,node in pairs(ports) do   
        print("checking "..name.." ...")
-       local ins, outs = get_port_con(name, "out")
+       local ins, outs, cars = get_port_con(name, "out")
        if outs ~= nil then
            for i=1,#outs do       
-             file:write(name.." -> "..outs[i].."\n")
+             file:write(name..", "..outs[i]..", "..cars[i].."\n")
            end
        end    
     end

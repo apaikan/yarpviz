@@ -26,6 +26,7 @@ function load_log(filename)
       data[#data + 1] = line
   end
   file:close()
+  print("'"..filename.."' is loaded!")
   return data
 end
 
@@ -63,6 +64,7 @@ help            : show help
 exit            : exit portadmin
 load <filename> : loads a connections list file 
 attach <portmonitor> <context> [send|recv] : attach a portmonitor to the list of connections
+detach          : dettach any portmonitors from the list of connections
 ]]
     print(msg)
 end
@@ -77,22 +79,47 @@ function attach(cons, plugin, context, side)
         return false
     end
     for i=1,#cons do
-        local ports = cons[i]:split("->")
-        if #ports ~= 2 then
+        local ports = cons[i]:split(",")
+        if #ports ~= 3 then
             print("Error while parsing the connection list file at line "..i)
             return false
         end
         -- triming the spaces
         src = ports[1]:match "^%s*(.-)%s*$"
         dest = ports[2]:match "^%s*(.-)%s*$"
+        car = ports[3]:match "^%s*(.-)%s*$"
         local ret = yarp.NetworkBase_connect(src, dest,
-                                 "tcp+"..side..".portmonitor+context."..context.."+file."..plugin)
+                                 car.."+"..side..".portmonitor+context."..context.."+file."..plugin)
         if ret == false then
             print("Cannot connect '"..src.."' to '"..dest.."' using plugin '"..plugin.."'")
         end
     end
     return true
 end
+
+function detach(cons)
+    if cons == nil or #cons == 0 then
+        print("Connections list is empty. Did you load any connection list file?")
+        return false
+    end
+    for i=1,#cons do
+        local ports = cons[i]:split(",")
+        if #ports ~= 3 then
+            print("Error while parsing the connection list file at line "..i)
+            return false
+        end
+        -- triming the spaces
+        src = ports[1]:match "^%s*(.-)%s*$"
+        dest = ports[2]:match "^%s*(.-)%s*$"
+        car = ports[3]:match "^%s*(.-)%s*$"
+        local ret = yarp.NetworkBase_connect(src, dest, car)
+        if ret == false then
+            print("Cannot reconnect '"..src.."' to '"..dest.."' using carrier '"..car.."'")
+        end
+    end
+    return true
+end
+
 -------------------------------------------------------
 -- main 
 -------------------------------------------------------
@@ -108,6 +135,10 @@ type 'help' for more information.
 ]]
 
 print(logo)
+
+if #arg > 0 then
+    cons = load_log(arg[1])
+end
 
 repeat
     io.write(">> ") io.flush()
@@ -131,6 +162,13 @@ repeat
             if #tokens > 3 then side = tokens[4] end
             attach(cons, tokens[2], tokens[3], side)
         end
+    elseif tokens[1] == "detach" then    
+        if #tokens > 1 then 
+            print("Usage: detach") 
+        else
+            detach(cons)
+        end
+
     else
         print("'"..cmd.."' is not correct. type 'help' for more information.")
     end
