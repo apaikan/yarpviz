@@ -87,16 +87,16 @@ function get_port_con(port_name)
     outs_list[#outs_list+1] = out_name
     -- get the carrier
     cmd:clear()
-    reply:clear()
+    local reply2 = yarp.Bottle()
     cmd:addString("list")
     cmd:addString("out")
     cmd:addString(out_name)
-    if ping:write(cmd, reply) == false then
+    if ping:write(cmd, reply2) == false then
       print("Cannot write to " .. port_name)
       ping:close()
       return nil, outs_list, nil 
     end
-    outs_carlist[#outs_carlist+1] = reply:find("carrier"):asString()
+    outs_carlist[#outs_carlist+1] = reply2:find("carrier"):asString()
   end 
 
   cmd:clear()
@@ -184,7 +184,7 @@ file:write(dot_header.."\n")
 
 for name,node in pairs(ports) do 
     if prop:check("only-cons") == true then
-        local ins, outs = get_port_con(name)
+        local ins, outs, cars = get_port_con(name)
         if ins ~= nil and outs ~= nil then 
             if #outs ~= 0 or #ins ~=1 then
                 file:write(node.." [label=\""..name.."\"]\n")
@@ -197,10 +197,10 @@ end
 
 for name,node in pairs(ports) do   
    print("checking "..name.." ...")
-   local ins, outs = get_port_con(name, "out")
+   local ins, outs, cars = get_port_con(name, "out")
    if outs ~= nil then 
-       for i=1,#outs do       
-         local to = ports[outs[i] ]
+       for i=1,#outs do
+         local to = ports[outs[i]]
          file:write(node.." -> "..to.."\n")
        end
    end    

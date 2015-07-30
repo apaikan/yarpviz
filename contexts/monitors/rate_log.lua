@@ -47,7 +47,7 @@ PortMonitor.create = function(options)
     destinationName = options:find("destination"):asString()  
 
     -- log parameters
-    param_log_raw = false
+    param_log_raw = true
     param_log_start = true
     param_log_name = os.getenv("HOME").."/portmonitor/"..string.gsub(sourceName,"/","_").."."..string.gsub(destinationName,"/","_")..".log"
                 
