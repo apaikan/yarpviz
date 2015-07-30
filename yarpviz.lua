@@ -140,9 +140,11 @@ if typ == "txt" then
     for name,node in pairs(ports) do   
        print("checking "..name.." ...")
        local ins, outs = get_port_con(name, "out")
-       for i=1,#outs do       
-         file:write(name.." -> "..outs[i].."\n")
-       end
+       if outs ~= nil then
+           for i=1,#outs do       
+             file:write(name.." -> "..outs[i].."\n")
+           end
+       end    
     end
     file:close()
     os.exit()
@@ -169,8 +171,10 @@ file:write(dot_header.."\n")
 for name,node in pairs(ports) do 
     if prop:check("only-cons") == true then
         local ins, outs = get_port_con(name)
-        if #outs ~= 0 or #ins ~=1 then
-            file:write(node.." [label=\""..name.."\"]\n")
+        if ins ~= nil and outs ~= nil then 
+            if #outs ~= 0 or #ins ~=1 then
+                file:write(node.." [label=\""..name.."\"]\n")
+            end    
         end    
      else
         file:write(node.." [label=\""..name.."\"]\n")
@@ -180,10 +184,12 @@ end
 for name,node in pairs(ports) do   
    print("checking "..name.." ...")
    local ins, outs = get_port_con(name, "out")
-   for i=1,#outs do       
-     local to = ports[outs[i] ]
-     file:write(node.." -> "..to.."\n")
-   end
+   if outs ~= nil then 
+       for i=1,#outs do       
+         local to = ports[outs[i] ]
+         file:write(node.." -> "..to.."\n")
+       end
+   end    
 end
 
 file:write("}\n")
