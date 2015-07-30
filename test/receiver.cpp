@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     cout<<"Current sched policy: '"<<sched_getscheduler(0)<<"' and priority: '"<<sch_param.__sched_priority<<"'\n";
 
     BufferedPort<Bottle> inPort;
-    if(!inPort.open("/test"))
+    if(!inPort.open("/receiver"))
         return 0;
     
     if(!NetworkBase::connect("/coman/left_arm/state:o", 
