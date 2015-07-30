@@ -143,6 +143,7 @@ end
 repeat
     io.write(">> ") io.flush()
     local cmd = io.read()
+    cmd = cmd:match "^%s*(.-)%s*$"
     if cmd == "exit" or cmd == "quit" then break end
     tokens = cmd:split(" ")
     -- loading the file
