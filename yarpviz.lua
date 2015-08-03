@@ -137,6 +137,8 @@ if prop:check("help") then
   os.exit()
 end
 
+os.execute("yarp clean --timeout 0.2")
+
 local ports = yarp_name_list()
 
 typ = "txt"

@@ -19,16 +19,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    /*
 	struct sched_param sch_param;
 	sch_param.__sched_priority = sched_get_priority_max(SCHED_FIFO) / 4;
 	if( sched_setscheduler(0, SCHED_FIFO, &sch_param) != 0 ) {
 		cout<<"sched_setscheduler failed."<<endl;
 		return 0;
 	}
-
-   
-
     cout<<"Current sched policy: '"<<sched_getscheduler(0)<<"' and priority: '"<<sch_param.__sched_priority<<"'\n";
+    */
 
     BufferedPort<Bottle> inPort;
     if(!inPort.open("/receiver"))

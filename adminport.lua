@@ -63,61 +63,112 @@ function help()
 help            : show help
 exit            : exit portadmin
 load <filename> : loads a connections list file 
-attach <portmonitor> <context> [send|recv] : attach a portmonitor to the list of connections
-detach          : dettach any portmonitors from the list of connections
+list            : list the loaded connections 
+attach <id|*> <portmonitor> <context> [send|recv] : attach a portmonitor to the connections
+detach <id|*>   : dettach any portmonitors from the the connections 
+qos <id|*> <LOW|NORM|HIGH|CRIT> <sched_priority> [sched_policy: 0|1|2] : set the packet QoS and thread priority of the connections..   
 ]]
     print(msg)
 end
 
-function attach(cons, plugin, context, side)
+function attach(cons, id, plugin, context, side)
     if side ~= "send" and side ~= "recv" then
         print("'"..side.."' is not correct. Available options are 'send' and 'recv'.")
         return false
     end
-    if cons == nil or #cons == 0 then
-        print("Connections list is empty. Did you load any connection list file?")
+    if cons == nil or #cons < id then
+        print("'"..id.."' is out of the range. Did you load any connection list file?")
         return false
     end
-    for i=1,#cons do
-        local ports = cons[i]:split(",")
-        if #ports ~= 3 then
-            print("Error while parsing the connection list file at line "..i)
-            return false
-        end
-        -- triming the spaces
-        src = ports[1]:match "^%s*(.-)%s*$"
-        dest = ports[2]:match "^%s*(.-)%s*$"
-        car = ports[3]:match "^%s*(.-)%s*$"
-        local ret = yarp.NetworkBase_connect(src, dest,
-                                 car.."+"..side..".portmonitor+context."..context.."+file."..plugin)
-        if ret == false then
-            print("Cannot connect '"..src.."' to '"..dest.."' using plugin '"..plugin.."'")
-        end
+
+    local ports = cons[id]:split(",")
+    if #ports ~= 3 then
+        print("Error while parsing the connection list file at line "..i)
+        return false
+    end
+    -- triming the spaces
+    src = ports[1]:match "^%s*(.-)%s*$"
+    dest = ports[2]:match "^%s*(.-)%s*$"
+    car = ports[3]:match "^%s*(.-)%s*$"
+    local ret = yarp.NetworkBase_connect(src, dest,
+                             car.."+"..side..".portmonitor+context."..context.."+file."..plugin)
+    if ret == false then
+        print("Cannot connect '"..src.."' to '"..dest.."' using plugin '"..plugin.."'")
     end
     return true
 end
 
-function detach(cons)
-    if cons == nil or #cons == 0 then
-        print("Connections list is empty. Did you load any connection list file?")
+function detach(cons, id)
+    if cons == nil or #cons < id then
+        print("'"..id.."' is out of the range. Did you load any connection list file?")
         return false
     end
-    for i=1,#cons do
-        local ports = cons[i]:split(",")
-        if #ports ~= 3 then
-            print("Error while parsing the connection list file at line "..i)
-            return false
-        end
-        -- triming the spaces
-        src = ports[1]:match "^%s*(.-)%s*$"
-        dest = ports[2]:match "^%s*(.-)%s*$"
-        car = ports[3]:match "^%s*(.-)%s*$"
-        local ret = yarp.NetworkBase_connect(src, dest, car)
-        if ret == false then
-            print("Cannot reconnect '"..src.."' to '"..dest.."' using carrier '"..car.."'")
-        end
+
+    local ports = cons[id]:split(",")
+    if #ports ~= 3 then
+        print("Error while parsing the connection list file at line "..i)
+        return false
+    end
+    -- triming the spaces
+    src = ports[1]:match "^%s*(.-)%s*$"
+    dest = ports[2]:match "^%s*(.-)%s*$"
+    car = ports[3]:match "^%s*(.-)%s*$"
+    local ret = yarp.NetworkBase_connect(src, dest, car)
+    if ret == false then
+        print("Cannot reconnect '"..src.."' to '"..dest.."' using carrier '"..car.."'")
     end
     return true
+end
+
+function list(cons)
+    for i=1,#cons do
+        print("["..i.."]\t"..cons[i])
+    end
+end
+
+function set_qos_ports(src, dest, qos, prio, policy, only_sched) 
+    local ping = yarp.Port()  
+    ping:open("/anon_rpc");  
+    ping:setAdminMode(true)
+    local ret = yarp.NetworkBase_connect(ping:getName(), src)
+    if ret == false then
+      print("Cannot connect to " .. src)
+      return false
+    end
+    local cmd = yarp.Bottle()
+    local reply = yarp.Bottle()
+    admin_cmd = "prop set "..dest.." (sched ((priority "..prio..") (policy "..policy..")))"
+    if only_sched == false then
+        admin_cmd = admin_cmd .. " (qos ((priority "..qos..")))"
+    end    
+    print(admin_cmd)
+    cmd:fromString(admin_cmd);
+    --print(cmd:toString())
+    if ping:write(cmd, reply) == false then
+      print("Cannot write to " .. port_name)
+      ping:close()
+      return false
+    end     
+    ping:close()
+    print(reply:toString())
+end
+
+function set_qos(cons, id, qos, prio, policy) 
+    if cons == nil or #cons < id then
+        print("'"..id.."' is out of the range. Did you load any connection list file?")
+        return false
+    end
+
+    local ports = cons[id]:split(",")
+    if #ports ~= 3 then
+        print("Error while parsing the connection list file at line "..i)
+        return false
+    end
+    -- triming the spaces
+    src = ports[1]:match "^%s*(.-)%s*$"
+    dest = ports[2]:match "^%s*(.-)%s*$"
+    set_qos_ports(src, dest, qos, prio, policy, false)
+    set_qos_ports(dest, src, qos, prio, policy, true)
 end
 
 -------------------------------------------------------
@@ -155,19 +206,53 @@ repeat
         else
             cons = load_log(tokens[2]) 
         end
+    elseif tokens[1] == "list" then
+        list(cons)
     elseif tokens[1] == "attach" then    
-        if #tokens < 3 then 
-            print("Usage: attach <portmonitor> <context> [send|recv].") 
+        if #tokens < 4 then 
+            print("Usage: attach <id|*> <portmonitor> <context> [send|recv].") 
         else
             local side = "recv"
-            if #tokens > 3 then side = tokens[4] end
-            attach(cons, tokens[2], tokens[3], side)
+            if #tokens > 4 then side = tokens[5] end
+            if tokens[2] == "*" then
+                for i=1,#cons do
+                    attach(cons, i, tokens[3], tokens[4], side)
+                end
+            else
+                local id = tonumber(tokens[2])
+                attach(cons, id, tokens[3], tokens[4], side)
+            end    
         end
     elseif tokens[1] == "detach" then    
-        if #tokens > 1 then 
-            print("Usage: detach") 
+        if #tokens ~= 2 then 
+            print("Usage: detach <id|*>") 
         else
-            detach(cons)
+            print(tokens[2])
+            if tokens[2] == "*" then
+                for i=1,#cons do
+                    detach(cons, i)
+                end
+            else
+                local id = tonumber(tokens[2])
+                detach(cons, id)
+            end    
+        end
+    elseif tokens[1] == "qos" then    
+        if #tokens < 4 then 
+            print("Usage: qos <id|*> <LOW|NORM|HIGH|CRIT> <sched_priority> [sched_policy].") 
+        else
+            local qos = tokens[3]
+            local prio = tokens[4]
+            local policy = 1
+            if #tokens > 4 then policy = tonumber(tokens[5]) end
+            if tokens[2] == "*" then
+                for i=1,#cons do
+                    set_qos(cons, i, qos, prio, policy) 
+                end
+            else
+                local id = tonumber(tokens[2])
+                set_qos(cons, id, qos, prio, policy) 
+            end    
         end
 
     else
