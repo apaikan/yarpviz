@@ -126,33 +126,6 @@ function list(cons)
     end
 end
 
-function set_qos_ports(src, dest, qos, prio, policy, only_sched) 
-    local ping = yarp.Port()  
-    ping:open("/anon_rpc");  
-    ping:setAdminMode(true)
-    local ret = yarp.NetworkBase_connect(ping:getName(), src)
-    if ret == false then
-      print("Cannot connect to " .. src)
-      return false
-    end
-    local cmd = yarp.Bottle()
-    local reply = yarp.Bottle()
-    admin_cmd = "prop set "..dest.." (sched ((priority "..prio..") (policy "..policy..")))"
-    if only_sched == false then
-        admin_cmd = admin_cmd .. " (qos ((priority "..qos..")))"
-    end    
-    print(admin_cmd)
-    cmd:fromString(admin_cmd);
-    --print(cmd:toString())
-    if ping:write(cmd, reply) == false then
-      print("Cannot write to " .. port_name)
-      ping:close()
-      return false
-    end     
-    ping:close()
-    print(reply:toString())
-end
-
 function set_qos(cons, id, qos, prio, policy) 
     if cons == nil or #cons < id then
         print("'"..id.."' is out of the range. Did you load any connection list file?")
@@ -167,8 +140,11 @@ function set_qos(cons, id, qos, prio, policy)
     -- triming the spaces
     src = ports[1]:match "^%s*(.-)%s*$"
     dest = ports[2]:match "^%s*(.-)%s*$"
-    set_qos_ports(src, dest, qos, prio, policy, false)
-    set_qos_ports(dest, src, qos, prio, policy, true)
+    style = yarp.QosStyle()
+    style.threadPriority = prio
+    style.threadPolicy = policy
+    style.packetPriority = yarp.Vocab_encode(qos)
+    yarp.NetworkBase_setConnectionQos(src, dest, style, false)
 end
 
 -------------------------------------------------------
