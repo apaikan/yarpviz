@@ -203,7 +203,9 @@ for name,node in pairs(ports) do
    if outs ~= nil then 
        for i=1,#outs do
          local to = ports[outs[i]]
-         file:write(node.." -> "..to.."\n")
+         if to ~= nil then
+            file:write(node.." -> "..to.."\n")
+         end   
        end
    end    
 end

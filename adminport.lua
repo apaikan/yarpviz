@@ -121,6 +121,7 @@ function detach(cons, id)
 end
 
 function list(cons)
+    if cons == nil then return end
     for i=1,#cons do
         print("["..i.."]\t"..cons[i])
     end
@@ -141,9 +142,12 @@ function set_qos(cons, id, qos, prio, policy)
     src = ports[1]:match "^%s*(.-)%s*$"
     dest = ports[2]:match "^%s*(.-)%s*$"
     style = yarp.QosStyle()
-    style.threadPriority = prio
-    style.threadPolicy = policy
-    style.packetPriority = yarp.Vocab_encode(qos)
+    style:setThreadPriority(prio)
+    style:setThreadPolicy(policy)
+    if style:setPacketPriority("LEVEL:"..qos) == false then
+        print("Cannot set qos level'"..qos.."'.")
+        return
+    end
     yarp.NetworkBase_setConnectionQos(src, dest, style, false)
 end
 
