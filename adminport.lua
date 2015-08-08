@@ -66,7 +66,8 @@ load <filename> : loads a connections list file
 list            : list the loaded connections 
 attach <id|*> <portmonitor> <context> [send|recv] : attach a portmonitor to the connections
 detach <id|*>   : dettach any portmonitors from the the connections 
-qos <id|*> <LOW|NORM|HIGH|CRIT> <sched_priority> [sched_policy: 0|1|2] : set the packet QoS and thread priority of the connections..   
+qos set <id|*> <LOW|NORM|HIGH|CRIT> <sched_priority> [sched_policy: 0|1|2] : set the packet QoS and thread priority of the connections.
+qos get <id|*>  : get the packet QoS and thread priority of the connections.     
 ]]
     print(msg)
 end
@@ -151,6 +152,37 @@ function set_qos(cons, id, qos, prio, policy)
     yarp.NetworkBase_setConnectionQos(src, dest, style, false)
 end
 
+function get_qos_level(packet)
+    if packet == -1 then return "Invalid" 
+    elseif packet == 0 then return "Norm" 
+    elseif packet == 10 then return "Low" 
+    elseif packet == 36 then return "High" 
+    elseif packet == 44 then return "Crit" 
+    else return "Undefined" end
+end
+
+function get_qos(cons, id) 
+    if cons == nil or #cons < id then
+        print("'"..id.."' is out of the range. Did you load any connection list file?")
+        return false
+    end
+
+    local ports = cons[id]:split(",")
+    if #ports ~= 3 then
+        print("Error while parsing the connection list file at line "..i)
+        return false
+    end
+    -- triming the spaces
+    src = ports[1]:match "^%s*(.-)%s*$"
+    dest = ports[2]:match "^%s*(.-)%s*$"
+    style_src = yarp.QosStyle()
+    style_dest = yarp.QosStyle()
+    ret = yarp.NetworkBase_getConnectionQos(src, dest, style_src, style_dest, false)
+    if ret == false then return end
+    print("["..id.."]\t".."thread: ("..style_src:getThreadPriority()..", "..style_src:getThreadPolicy()..") packet: ("..get_qos_level(style_src:getPacketPriorityAsLevel())..")\t"..src)
+    print("["..id.."]\t".."thread: ("..style_dest:getThreadPriority()..", "..style_dest:getThreadPolicy()..") packet: ("..get_qos_level(style_dest:getPacketPriorityAsLevel())..")\t"..dest)
+end
+
 -------------------------------------------------------
 -- main 
 -------------------------------------------------------
@@ -217,24 +249,38 @@ repeat
                 detach(cons, id)
             end    
         end
-    elseif tokens[1] == "qos" then    
-        if #tokens < 4 then 
-            print("Usage: qos <id|*> <LOW|NORM|HIGH|CRIT> <sched_priority> [sched_policy].") 
-        else
-            local qos = tokens[3]
-            local prio = tokens[4]
-            local policy = 1
-            if #tokens > 4 then policy = tonumber(tokens[5]) end
-            if tokens[2] == "*" then
-                for i=1,#cons do
-                    set_qos(cons, i, qos, prio, policy) 
-                end
+    elseif #tokens > 2 and tokens[1] == "qos" then
+        if tokens[2] == "get" then
+            if #tokens < 3 then 
+                print("Usage: qos get <id|*>.") 
             else
-                local id = tonumber(tokens[2])
-                set_qos(cons, id, qos, prio, policy) 
-            end    
-        end
-
+                if tokens[3] == "*" then
+                    for i=1,#cons do
+                        get_qos(cons, i) 
+                    end
+                else
+                    local id = tonumber(tokens[3])
+                    get_qos(cons, id) 
+                end
+            end        
+        elseif tokens[2] == "set" then
+            if #tokens < 5 then 
+                print("Usage: qos set <id|*> <LOW|NORM|HIGH|CRIT> <sched_priority> [sched_policy].") 
+            else
+                local qos = tokens[4]
+                local prio = tokens[5]
+                local policy = 1
+                if #tokens > 5 then policy = tonumber(tokens[6]) end
+                if tokens[3] == "*" then
+                    for i=1,#cons do
+                        set_qos(cons, i, qos, prio, policy) 
+                    end
+                else
+                    local id = tonumber(tokens[3])
+                    set_qos(cons, id, qos, prio, policy) 
+                end
+            end
+        end    
     else
         print("'"..cmd.."' is not correct. type 'help' for more information.")
     end
