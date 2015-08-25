@@ -178,9 +178,9 @@ end
 
 dot_header = [[
 digraph "" {
-  graph [ranksep="1.0", nodesp="0.5", rankdir="LR", overlap="false", packmode="graph", fontname="Arial", fontsize="12", concentrate="true", bgcolor="#FFFFFF"];
-  node [style="filled", color="blue", fillcolor="#F0F0F0", label="", sides="4", fontcolor="black", fontname="Arial", fontsize="12", shape="ellipse"];
-  edge [color="#CC0044", label="", fontname="Arial", fontsize="8", fontcolor="#555555"];]]
+  graph [ranksep="1.0", nodesp="0.5", rankdir="LR", overlap="false", packmode="graph", fontname="helvetica", fontsize="10", concentrate="true", bgcolor="#2e3e56"];
+  node [style="filled", color="#edad56", fillcolor="#edad56", label="", sides="4", fontcolor="#333333", fontname="helvetica", fontsize="10", shape="ellipse"];
+  edge [penwidth=1.5, color="#FFFFFF", label="", fontname="Arial", fontsize="8", fontcolor="#555555"];]]
   
 file:write(dot_header.."\n")
 
