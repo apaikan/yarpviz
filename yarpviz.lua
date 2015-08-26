@@ -71,6 +71,8 @@ function get_port_con(port_name)
       print("Cannot connect to " .. port_name)
       return nil, nil, nil
   end
+
+  --getting output list
   local cmd = yarp.Bottle()
   local reply = yarp.Bottle()
   cmd:addString("list")
@@ -85,7 +87,7 @@ function get_port_con(port_name)
   for i=0,reply:size()-1 do 
     out_name = reply:get(i):asString()
     outs_list[#outs_list+1] = out_name
-    -- get the carrier
+    -- getting the carrier
     cmd:clear()
     local reply2 = yarp.Bottle()
     cmd:addString("list")
@@ -99,6 +101,7 @@ function get_port_con(port_name)
     outs_carlist[#outs_carlist+1] = reply2:find("carrier"):asString()
   end 
 
+  -- getting input list
   cmd:clear()
   reply:clear()
   cmd:addString("list")
@@ -112,8 +115,26 @@ function get_port_con(port_name)
   for i=0,reply:size()-1 do 
     ins_list[#ins_list+1] = reply:get(i):asString()
   end 
+
+  -- getting port owner name 
+  cmd:clear()
+  reply:clear()
+  cmd:addString("prop")
+  cmd:addString("get") 
+  cmd:addString(port_name) 
+  if ping:write(cmd, reply) == false then
+      print("Cannot write to " .. port_name)
+      ping:close()
+      return nil, ins_list, outs_list, outs_carlist
+  end  
+  proc = reply:findGroup("process")
+  proc_prop = proc:get(1):asDict()
+  owner = {}
+  owner["name"] = proc_prop:find("name"):asString()
+  owner["arguments"] = proc_prop:find("arguments"):asString()
+  owner["pid"] = proc_prop:find("pid"):asInt()
   ping:close()
-  return ins_list, outs_list, outs_carlist
+  return ins_list, outs_list, outs_carlist, owner
 end
 
 ---------------------------------------------------------------------
@@ -133,7 +154,10 @@ if prop:check("help") then
   print("  --out  <output_name>\t Output file name (default: output.txt)")
   print("  --type <output_type>\t Output type: pdf, eps, svg, jpg, png, txt (default: txt)")
   print("  --gen  <generator>  \t Graphviz-based graph generator: dot, neato, twopi, circo (default: dot)")
-  print("  --only-cons         \t Shows only the ports with a connections")
+  print("  --nodesep <value>   \t Specifies the minimum vertical distance between the adjacent nodes  (default: 0.4)")
+  print("  --ranksep <value>   \t Specifies the minimum distance between the adjacent nodes (default: 0.5)")
+
+--  print("  --all-ports         \t Shows all the ports even without any connection")
   os.exit()
 end
 
@@ -175,28 +199,65 @@ if file == nil then
   os.exit()
 end  
   
+ranksep = 0.5
+nodesep = 0.4
+
+if prop:check("ranksep") then 
+    ranksep = prop:find("ranksep"):asDouble()
+end
+if prop:check("nodesep") then 
+    nodesep = prop:find("nodesep"):asDouble()
+end    
+
+digraph = "digraph \"\" {\n  nodesep="..nodesep..";\n  ranksep="..ranksep..";\n"
+file:write(digraph)
 
 dot_header = [[
-digraph "" {
-  graph [ranksep="1.0", nodesp="0.5", rankdir="LR", overlap="false", packmode="graph", fontname="helvetica", fontsize="10", concentrate="true", bgcolor="#2e3e56"];
-  node [style="filled", color="#edad56", fillcolor="#edad56", label="", sides="4", fontcolor="#333333", fontname="helvetica", fontsize="10", shape="ellipse"];
+  graph [rankdir="LR", overlap="false", packmode="graph", fontname="helvetica", fontsize="10", concentrate="true", bgcolor="#2e3e56"];
+  node [style="filled", color="#edad56", fillcolor="#edad56", label="", sides="4", fontcolor="#333333", fontname="helvetica", fontsize="10", shape="cds"];
   edge [penwidth=1.5, color="#FFFFFF", label="", fontname="Arial", fontsize="8", fontcolor="#555555"];]]
   
 file:write(dot_header.."\n")
 
+processes = {}
+owner_inputs = {}
+owner_outputs = {}
 for name,node in pairs(ports) do 
-    if prop:check("only-cons") == true then
-        local ins, outs, cars = get_port_con(name)
+    local ins, outs, cars, owner = get_port_con(name)
+    owner["outputs"] = {}
+    owner["inputs"] = {}
+    if prop:check("all-ports") ~= true then        
         if ins ~= nil and outs ~= nil then 
             if #outs ~= 0 or #ins ~=1 then
                 file:write(node.." [label=\""..name.."\"]\n")
-            end    
+                if #outs ~= 0 then 
+                    owner_outputs[node] = owner["pid"]
+                else
+                    owner_inputs[node] = owner["pid"]
+                end
+            end 
         end    
      else
         file:write(node.." [label=\""..name.."\"]\n")
     end 
+    processes[owner["pid"]] = owner
 end
 
+-- adding owner (process) shapes
+for pid,info in pairs(processes) do 
+    file:write(pid.." [label=\""..info["name"].."\\n"..info["arguments"].."\", shape=\"component\", color=\"#a5cf80\",  fillcolor=\"#a5cf80\"]\n")
+end
+
+-- adding ports to the owner
+for node,pid in pairs(owner_outputs) do 
+    file:write(pid.." -> "..node.." [penwidth=1.0, style=\"dashed\", color=\"#8c8c8c\"]\n")
+end
+
+for node,pid in pairs(owner_inputs) do 
+    file:write(node.." -> "..pid.." [penwidth=1.0, style=\"dashed\", color=\"#8c8c8c\"]\n")
+end
+
+-- adding connection links
 for name,node in pairs(ports) do   
    print("checking "..name.." ...")
    local ins, outs, cars = get_port_con(name, "out")
@@ -204,7 +265,7 @@ for name,node in pairs(ports) do
        for i=1,#outs do
          local to = ports[outs[i]]
          if to ~= nil then
-            file:write(node.." -> "..to.."\n")
+            file:write(node.." -> "..to.."[weight=0.1]\n")
          end   
        end
    end    
